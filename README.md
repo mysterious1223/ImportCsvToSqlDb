@@ -15,7 +15,7 @@ Config:
           "database": "",
           "username": "",
           "password": "",
-          "server_type": ""
+          "server_type": "sql_server"
        }
 
     ]
@@ -24,4 +24,4 @@ Config:
 
 
 sql support:
-SQL Server
+SQL Server: ```sql_server```
