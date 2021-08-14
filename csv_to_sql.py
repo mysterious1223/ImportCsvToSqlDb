@@ -5,6 +5,7 @@ try:
     import pymssql as ms
     import sys
     import json
+    import os
 except Exception as e:
     print(str(e))
 
@@ -97,7 +98,13 @@ class database_connection_object:
 def load_csv_into_memory(path):
     # load into conn (database)
     df = pd.read_csv(path)
-    df.drop("Unnamed: 0", axis="columns", inplace=True)
+    if "Unnamed: 0" in df.columns:
+        df.drop("Unnamed: 0", axis="columns", inplace=True)
+
+    if df.empty:
+        print ('Data frame is empty...')
+        quit()
+
     return df
 
 
@@ -206,6 +213,7 @@ def check_if_table_exist_or_create(data_df, tbl_name, schema, sql):
     # need to loop through the colunns
     try:
         data_df.columns = [x.replace(" ", "_") for x in data_df.columns]
+        data_df.columns = ['[Index]' if 'index' == x.lower() else x for x in data_df.columns]
         for col in data_df.columns:
             if data_df.columns.get_loc(col) + 1 != len(data_df.columns):
                 create_query_str += f"""
@@ -215,10 +223,9 @@ def check_if_table_exist_or_create(data_df, tbl_name, schema, sql):
                     {col} VARCHAR(MAX)
                 )
                 """
-    except:
-        print("Failed to build create table string...")
+    except Exception as e:
+        print(f"Failed to build create table string...{str(e)}")
         return False
-
     print(create_query_str)
     res = sql.execute_sql_command(create_query_str)
 
@@ -256,22 +263,30 @@ def __main__():
         print("Incorrect args")
         print("app <csv> <schema> <json config>")
         quit()
-    csv_file = sys.argv[1]
+    csv_file_path = sys.argv[1]
+    csv_file = csv_file_path
+
+    if '/' in csv_file_path or '\'' in csv_file_path:
+        csv_file = os.path.basename(csv_file_path) 
+
     schema_name = sys.argv[2]
     db_json_config = sys.argv[3]
     db_con_obj = parse_json_config_todbobj(db_json_config)
     print(f"Loading {csv_file}")
     sql = SqlServerConnector(db_con_obj)
     sql.connect_to_db()
-    csv_df = load_csv_into_memory(csv_file)
+    csv_df = load_csv_into_memory(csv_file_path)
     csv_name = csv_file.split(".")[0]
 
+    print ('Step1')
     if not check_if_schema_exist_or_create(schema_name, sql):
         print("Failed to create schema")
         quit()
+    print ('Step2')
     if not check_if_table_exist_or_create(csv_df, csv_name, schema_name, sql):
         print("Failed to create table")
         quit()
+    print ('Step3')
     if not load_df_to_database_schema_table(csv_df, schema_name, csv_name, sql):
         print("Failed to import data")
         quit()
